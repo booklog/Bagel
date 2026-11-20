@@ -42,7 +42,8 @@
  - (void)_didFinishWithError:(id)arg1;
  - (void)_didReceiveData:(id)arg1;
  - (void)_didReceiveResponse:(id)arg1 sniff:(bool)arg2; // ~> iOS 12
- - (void)_didReceiveResponse:(id)arg1 sniff:(bool)arg2 rewrite:(bool)arg3; // iOS 13
+ - (void)_didReceiveResponse:(id)arg1 sniff:(bool)arg2 rewrite:(bool)arg3; // some iOS 13 builds
+ (verified on iOS 26.5 / 27.2 simulators: only `_didReceiveResponse:sniff:` exists)
  
  https://github.com/JackRostron/iOS8-Runtime-Headers
  https://github.com/ksenks/iOS9-Runtime-Headers
@@ -65,11 +66,10 @@
 
 - (void)_inject
 {
-    //iOS8          : __NSCFURLSessionConnection
-    //iOS9,10,11    : __NSCFURLLocalSessionConnection
-
+    // Connection class (receives response / data / completion callbacks):
+    //   iOS 8             : __NSCFURLSessionConnection
+    //   iOS 9 and later   : __NSCFURLLocalSessionConnection (verified on iOS 26.5 / 27.2)
     Class sessionClass = NSClassFromString(@"__NSCFURLLocalSessionConnection");
-    Class taskClass = NSClassFromString(@"__NSCFURLSessionTask");
 
     if (sessionClass == nil) {
         sessionClass = NSClassFromString(@"__NSCFURLSessionConnection");
@@ -79,11 +79,20 @@
         [self swizzleSessionDidReceiveData:sessionClass];
         [self swizzleSessionDidReceiveResponse:sessionClass];
         [self swizzleSessiondDidFinishWithError:sessionClass];
+    } else {
+        NSLog(@"Bagel -> Warning: URLSession connection class not found. Responses will not be captured on this iOS version.");
     }
 
-    if (taskClass) {
-        [self swizzleSessionTaskResume:taskClass];
+    // Task class that implements -resume:
+    //   older iOS         : __NSCFURLSessionTask
+    //   recent iOS        : NSURLSessionTask, inherited by __NSCFLocal*Task (verified on iOS 26.5 / 27.2)
+    Class taskClass = NSClassFromString(@"__NSCFURLSessionTask");
+
+    if (taskClass == nil) {
+        taskClass = [NSURLSessionTask class];
     }
+
+    [self swizzleSessionTaskResume:taskClass];
 }
 
 - (void)swizzleSessionTaskResume:(Class) class
@@ -100,37 +109,43 @@
 
         void (^swizzledSessionTaskResume)(id) = ^void(id self) {
 
-            [weakSelf.delegate urlSessionInjector:weakSelf didStart:self];
+            // Only report the initial resume. Resuming a running or finished task
+            // must not create a new entry in the desktop client.
+            if ([self isKindOfClass:[NSURLSessionTask class]] &&
+                ((NSURLSessionTask*)self).state == NSURLSessionTaskStateSuspended) {
+                [weakSelf.delegate urlSessionInjector:weakSelf didStart:self];
+            }
 
-            originalIMPBlock(self, _cmd);
+            originalIMPBlock(self, selector);
         };
 
         method_setImplementation(m, imp_implementationWithBlock(swizzledSessionTaskResume));
     }
 }
 
-    - (void)swizzleSessionDidReceiveResponse : (Class) class
+- (void)swizzleSessionDidReceiveResponse:(Class) class
 {
-    if (@available(iOS 13.0, *)) {
-        SEL selector = NSSelectorFromString(@"_didReceiveResponse:sniff:rewrite:");
-        Method m = class_getInstanceMethod(class, selector);
+    // Some iOS 13 builds used `_didReceiveResponse:sniff:rewrite:`, while every
+    // other version checked (including iOS 26.5 / 27.2) uses `_didReceiveResponse:sniff:`.
+    // Probe the selectors instead of branching on the OS version.
+    SEL rewriteSelector = NSSelectorFromString(@"_didReceiveResponse:sniff:rewrite:");
+    Method rewriteMethod = class_getInstanceMethod(class, rewriteSelector);
 
-        if (m && [class instancesRespondToSelector:selector]) {
+    if (rewriteMethod && [class instancesRespondToSelector:rewriteSelector]) {
 
-            typedef void (*OriginalIMPBlockType)(id self, SEL _cmd, id arg1, BOOL sniff, BOOL rewrite);
-            OriginalIMPBlockType originalIMPBlock = (OriginalIMPBlockType)method_getImplementation(m);
+        typedef void (*OriginalIMPBlockType)(id self, SEL _cmd, id arg1, BOOL sniff, BOOL rewrite);
+        OriginalIMPBlockType originalIMPBlock = (OriginalIMPBlockType)method_getImplementation(rewriteMethod);
 
-            __weak BagelURLSessionInjector* weakSelf = self;
+        __weak BagelURLSessionInjector* weakSelf = self;
 
-            void (^swizzledSessionDidReceiveResponse)(id, id, BOOL, BOOL) = ^void(id self, id arg1, BOOL sniff, BOOL rewrite) {
+        void (^swizzledSessionDidReceiveResponse)(id, id, BOOL, BOOL) = ^void(id self, id arg1, BOOL sniff, BOOL rewrite) {
 
-                [weakSelf.delegate urlSessionInjector:weakSelf didReceiveResponse:[self valueForKey:@"task"] response:arg1];
+            [weakSelf.delegate urlSessionInjector:weakSelf didReceiveResponse:[self valueForKey:@"task"] response:arg1];
 
-                originalIMPBlock(self, _cmd, arg1, sniff, rewrite);
-            };
+            originalIMPBlock(self, rewriteSelector, arg1, sniff, rewrite);
+        };
 
-            method_setImplementation(m, imp_implementationWithBlock(swizzledSessionDidReceiveResponse));
-        }
+        method_setImplementation(rewriteMethod, imp_implementationWithBlock(swizzledSessionDidReceiveResponse));
         return;
     }
 
@@ -148,14 +163,14 @@
 
             [weakSelf.delegate urlSessionInjector:weakSelf didReceiveResponse:[self valueForKey:@"task"] response:arg1];
 
-            originalIMPBlock(self, _cmd, arg1, sniff);
+            originalIMPBlock(self, selector, arg1, sniff);
         };
 
         method_setImplementation(m, imp_implementationWithBlock(swizzledSessionDidReceiveResponse));
     }
 }
 
-    - (void)swizzleSessionDidReceiveData : (Class) class
+- (void)swizzleSessionDidReceiveData:(Class) class
 {
     SEL selector = NSSelectorFromString(@"_didReceiveData:");
     Method m = class_getInstanceMethod(class, selector);
@@ -171,14 +186,14 @@
 
             [weakSelf.delegate urlSessionInjector:weakSelf didReceiveData:[self valueForKey:@"task"] data:[arg1 copy]];
 
-            originalIMPBlock(self, _cmd, arg1);
+            originalIMPBlock(self, selector, arg1);
         };
 
         method_setImplementation(m, imp_implementationWithBlock(swizzledSessionDidReceiveData));
     }
 }
 
-- (void)swizzleSessiondDidFinishWithError : (Class) class
+- (void)swizzleSessiondDidFinishWithError:(Class) class
 {
     SEL selector = NSSelectorFromString(@"_didFinishWithError:");
     Method m = class_getInstanceMethod(class, selector);
@@ -194,7 +209,7 @@
 
             [weakSelf.delegate urlSessionInjector:weakSelf didFinishWithError:[self valueForKey:@"task"] error:arg1];
 
-            originalIMPBlock(self, _cmd, arg1);
+            originalIMPBlock(self, selector, arg1);
         };
 
         method_setImplementation(m, imp_implementationWithBlock(swizzledSessiondDidFinishWithError));

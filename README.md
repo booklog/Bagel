@@ -1,12 +1,8 @@
 # Bagel
 ![Bagel](https://github.com/yagiz/Bagel/blob/master/assets/header.png?raw=true)
 <p align="center">
-    <a href="https://github.com/CocoaPods/CocoaPods" alt="CocoaPods">
-        <img src="https://img.shields.io/badge/CocoaPods-compatible-4BC51D.svg?style=flat" /></a>
-    <a href="https://github.com/Carthage/Carthage" alt="Carthage">
-        <img src="https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat" /></a>
-    <a href="https://github.com/JamitLabs/Accio" alt="Accio">
-        <img src="https://img.shields.io/badge/Accio-supported-0A7CF5.svg?style=flat" /></a>
+    <a href="https://swift.org/package-manager/" alt="Swift Package Manager">
+        <img src="https://img.shields.io/badge/SPM-supported-4BC51D.svg?style=flat" /></a>
     <a href="https://github.com/yagiz/Bagel/releases" alt="Version">
         <img src="https://img.shields.io/github/release/yagiz/Bagel.svg" /></a>
 </p>
@@ -21,18 +17,23 @@ Bagel is a little native iOS network debugger. It's not a proxy debugger so you 
 - Install pods.
 - Build and archive the project.
 #### Install iOS Client
-#### CocoaPods
-```shhttps://img.shields.io/badge/version-1.3.1-blue.svg?style=flat
-pod 'Bagel', '~>  1.4.0'
-```
-##### Carthage
-```sh
-github "yagiz/Bagel" "1.4.0"
-```
-##### Accio
+Bagel is distributed with Swift Package Manager. In Xcode, choose **File > Add Package Dependencies...** and enter `https://github.com/yagiz/Bagel.git`, or add it to your `Package.swift`:
 ```swift
 .package(url: "https://github.com/yagiz/Bagel.git", .upToNextMajor(from: "1.4.0")),
 ```
+The iOS client requires iOS 17.0 or later. CocoaPods and Carthage are no longer supported.
+
+### Local Network permission
+Bagel finds the desktop client with Bonjour, so iOS requires your app to declare it. Add the following to your app's `Info.plist`, otherwise browsing fails and Bagel logs `Bonjour browsing is blocked by iOS Local Network privacy`:
+```xml
+<key>NSLocalNetworkUsageDescription</key>
+<string>Bagel uses the local network to send network logs to the Bagel desktop app.</string>
+<key>NSBonjourServices</key>
+<array>
+    <string>_Bagel._tcp</string>
+</array>
+```
+If you change `netserviceType`, list that value in `NSBonjourServices` instead. On first launch iOS asks the user to allow local network access; if it was denied, re-enable it in Settings > Privacy & Security > Local Network.
 
 ### Usage
 Most basic usage is to start Bagel iOS before any network operation. 
