@@ -25,6 +25,7 @@ class DataRepresentation: ContentRepresentation {
     }
 }
 
+@MainActor
 class DataRepresentationParser {
     
     static func parse(data: Data) -> DataRepresentation? {

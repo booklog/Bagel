@@ -10,6 +10,7 @@ import Cocoa
 
 class OverviewRepresentation: ContentRepresentation  {
 
+    @MainActor
     init(requestInfo: BagelRequestInfo?) {
         
         super.init()

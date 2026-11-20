@@ -7,7 +7,6 @@
 //
 
 import Cocoa
-import macOSThemeKit
 
 class OverviewViewController: BaseViewController, DetailSectionProtocol {
     

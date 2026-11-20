@@ -73,7 +73,7 @@
         void (^swizzleConnectionDidReceiveResponse)(id, NSURLConnection*, NSURLResponse*) = ^void  (id self, NSURLConnection* connection,NSURLResponse* response) {
             
             [weakSelf.delegate urlConnectionInjector:weakSelf didReceiveResponse:connection response:response];
-            originalIMPBlock(self,_cmd,connection,response);
+            originalIMPBlock(self,selector,connection,response);
         };
         
         method_setImplementation(m,imp_implementationWithBlock(swizzleConnectionDidReceiveResponse));
@@ -97,7 +97,7 @@
             
 
             [weakSelf.delegate urlConnectionInjector:weakSelf didReceiveData:connection data:data];
-            originalIMPBlock(self,_cmd,connection,data);
+            originalIMPBlock(self,selector,connection,data);
         };
         
         method_setImplementation(m,imp_implementationWithBlock(swizzleConnectionDidReceiveData));
@@ -120,7 +120,7 @@
         void (^swizzleConnectionDidFailWithError)(id, NSURLConnection*, NSError*) = ^void  (id self, NSURLConnection* connection,NSError* error) {
             
             [weakSelf.delegate urlConnectionInjector:weakSelf didFailWithError:connection error:error];
-            originalIMPBlock(self,_cmd,connection,error);
+            originalIMPBlock(self,selector,connection,error);
         };
         
         method_setImplementation(m,imp_implementationWithBlock(swizzleConnectionDidFailWithError));
@@ -143,7 +143,7 @@
         void (^swizzleConnectionDidFinishLoading)(id, NSURLConnection*) = ^void  (id self, NSURLConnection* connection) {
             
             [weakSelf.delegate urlConnectionInjector:weakSelf didFinishLoading:connection];
-            originalIMPBlock(self,_cmd,connection);
+            originalIMPBlock(self,selector,connection);
         };
         
         method_setImplementation(m,imp_implementationWithBlock(swizzleConnectionDidFinishLoading));

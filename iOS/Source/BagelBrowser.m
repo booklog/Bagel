@@ -80,26 +80,24 @@
 
 - (BOOL)connectWithService:(NSNetService*)service
 {
-    BOOL _isConnected = NO;
-
-    NSArray* addresses = [[service addresses] mutableCopy];
-
     GCDAsyncSocket* socket = [[GCDAsyncSocket alloc] initWithDelegate:self delegateQueue:dispatch_get_main_queue()];
 
-    while (!_isConnected && [addresses count]) {
-        NSData* address = [addresses objectAtIndex:0];
+    // Try each resolved address once. (Previously a failing address was never
+    // removed from the list, which spun the main thread forever.)
+    for (NSData* address in [service addresses]) {
 
         NSError* error = nil;
         if ([socket connectToAddress:address error:&error]) {
             [sockets addObject:socket];
+            return YES;
+        }
 
-            _isConnected = YES;
-
-        } else if (error) {
+        if (error) {
+            NSLog(@"Bagel -> Error: could not connect to %@: %@", service.name, error.localizedDescription);
         }
     }
 
-    return _isConnected;
+    return NO;
 }
 
 - (void)socket:(GCDAsyncSocket*)socket didConnectToHost:(NSString*)host port:(UInt16)port
@@ -140,7 +138,25 @@
 
 - (void)netServiceBrowser:(NSNetServiceBrowser*)aBrowser didNotSearch:(NSDictionary*)userInfo
 {
-    [self resetAndBrowse];
+    NSInteger errorCode = [userInfo[NSNetServicesErrorCode] integerValue];
+
+    if (errorCode == -72008) {
+        // NSNetServicesMissingRequiredConfigurationError (iOS 14+):
+        // the host app's Info.plist does not declare the Bonjour service type.
+        // Retrying cannot succeed, so stop here and explain how to fix it.
+        NSLog(@"Bagel -> Error: Bonjour browsing is blocked by iOS Local Network privacy. "
+              @"Add `NSBonjourServices` (containing \"%@\") and `NSLocalNetworkUsageDescription` "
+              @"to your app's Info.plist.", self.configuration.netserviceType);
+        return;
+    }
+
+    NSLog(@"Bagel -> Error: Bonjour browsing failed (%@). Retrying in 5 seconds.", userInfo);
+
+    // Retry with a delay instead of immediately, to avoid a tight retry loop.
+    __weak BagelBrowser* weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [weakSelf resetAndBrowse];
+    });
 }
 
 - (void)resetAndBrowse
