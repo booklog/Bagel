@@ -31,6 +31,7 @@ class ContentRepresentation: ContentRepresentable {
     }
 }
 
+@MainActor
 class ContentRepresentationParser {
     
     static func dataRepresentation(data: Data) -> DataRepresentation? {

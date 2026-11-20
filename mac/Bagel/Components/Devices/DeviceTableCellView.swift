@@ -19,7 +19,10 @@ class DeviceTableCellView: NSTableCellView {
     
     override func awakeFromNib() {
         super.awakeFromNib()
-        self.backgroundBox.fillColor = ThemeColor.deviceRowSelectedColor
+        // Nibs are always loaded on the main thread.
+        MainActor.assumeIsolated {
+            self.backgroundBox.fillColor = ThemeColor.deviceRowSelectedColor
+        }
     }
     
     func refresh() {

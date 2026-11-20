@@ -9,11 +9,15 @@
 import Cocoa
 import CocoaAsyncSocket
 
+@MainActor
 protocol BagelPublisherDelegate {
     
     func didGetPacket(publisher: BagelPublisher, packet: BagelPacket)
 }
 
+/// All socket and Bonjour callbacks are delivered on the main queue, so the
+/// publisher's state (`sockets` etc.) is only ever touched on the main actor.
+@MainActor
 class BagelPublisher: NSObject {
 
     var delegate: BagelPublisherDelegate?
@@ -26,7 +30,7 @@ class BagelPublisher: NSObject {
         
         self.sockets = []
         
-        self.mainSocket = GCDAsyncSocket(delegate: self, delegateQueue: DispatchQueue.global(qos: .background))
+        self.mainSocket = GCDAsyncSocket(delegate: self, delegateQueue: DispatchQueue.main)
 
         do {
             
@@ -63,9 +67,7 @@ class BagelPublisher: NSObject {
             
             let bagelPacket = try jsonDecoder.decode(BagelPacket.self, from: data)
             
-            DispatchQueue.main.async {
-                self.delegate?.didGetPacket(publisher: self, packet: bagelPacket)
-            }
+            self.delegate?.didGetPacket(publisher: self, packet: bagelPacket)
             
         } catch {
             
@@ -75,7 +77,8 @@ class BagelPublisher: NSObject {
 }
 
 
-extension BagelPublisher: NetServiceDelegate {
+// Callbacks arrive on the main run loop / main queue; @preconcurrency checks that at runtime.
+extension BagelPublisher: @preconcurrency NetServiceDelegate {
     
     func netServiceDidPublish(_ sender: NetService) {
         
@@ -90,7 +93,7 @@ extension BagelPublisher: NetServiceDelegate {
 }
 
 
-extension BagelPublisher: GCDAsyncSocketDelegate {
+extension BagelPublisher: @preconcurrency GCDAsyncSocketDelegate {
     
     func socket(_ sock: GCDAsyncSocket, didAcceptNewSocket newSocket: GCDAsyncSocket) {
         

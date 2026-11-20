@@ -18,6 +18,7 @@ struct BagelNotifications {
     static let didSelectPacket = NSNotification.Name("DidSelectPacket")
 }
 
+@MainActor
 class BagelController: NSObject, BagelPublisherDelegate {
     
     static let shared = BagelController()

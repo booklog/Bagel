@@ -8,6 +8,7 @@
 
 import Cocoa
 
+@MainActor
 class TextStyles {
     
     static let codeAttributes = [NSAttributedString.Key.foregroundColor: ThemeColor.labelColor, NSAttributedString.Key.font: FontManager.codeFont(size: 13)]
