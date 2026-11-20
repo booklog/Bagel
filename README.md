@@ -14,8 +14,8 @@ Bagel is a little native iOS network debugger. It's not a proxy debugger so you 
 ## Installation
 #### Install Mac App
 - Clone the repo.
-- Install pods.
-- Build and archive the project.
+- Open `mac/Bagel.xcodeproj` in Xcode. Dependencies are fetched automatically with Swift Package Manager.
+- Build and archive the project. The Mac app requires macOS 14.0 or later.
 #### Install iOS Client
 Bagel is distributed with Swift Package Manager. In Xcode, choose **File > Add Package Dependencies...** and enter `https://github.com/yagiz/Bagel.git`, or add it to your `Package.swift`:
 ```swift

@@ -8,7 +8,6 @@
 
 import Cocoa
 import WebKit
-import macOSThemeKit
 import Highlightr
 
 class DataJSONViewController: BaseViewController {
@@ -16,6 +15,8 @@ class DataJSONViewController: BaseViewController {
     var viewModel: DataJSONViewModel?
     
     let highlightr = Highlightr()
+
+    private var appearanceObservation: NSKeyValueObservation?
 
     @IBOutlet var rawTextView: NSTextView!
     
@@ -27,14 +28,20 @@ class DataJSONViewController: BaseViewController {
         
         self.copyToClipboardButton.image = ThemeImage.copyToClipboardIcon
         
-        NotificationCenter.default.addObserver(self, selector: #selector(changedTheme(_:)), name: .didChangeTheme, object: nil)
+        // Follow the system light / dark appearance.
+        self.appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.refreshHighlightrTheme()
+                self?.refresh()
+            }
+        }
         
         self.viewModel?.onChange = { [weak self] in
             self?.refresh()
         }
         
-        self.refresh()
         self.refreshHighlightrTheme()
+        self.refresh()
     }
 
     func refresh() {
@@ -55,15 +62,11 @@ class DataJSONViewController: BaseViewController {
     }
     
     func refreshHighlightrTheme() {
-        if ThemeManager.shared.effectiveTheme === ThemeManager.lightTheme {
-            self.highlightr?.setTheme(to: "github")
-        }else if ThemeManager.shared.effectiveTheme === ThemeManager.darkTheme {
+        if NSApp.effectiveAppearance.isDark {
             self.highlightr?.setTheme(to: "paraiso-dark")
+        } else {
+            self.highlightr?.setTheme(to: "github")
         }
-    }
-    
-    @objc private func changedTheme(_ notification: Notification) {
-        self.refreshHighlightrTheme()
     }
 
     @IBAction func copyButtonAction(_ sender: Any) {
